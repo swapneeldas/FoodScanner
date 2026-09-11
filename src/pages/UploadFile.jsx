@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
+import { APP_URL } from "../Constansts";
+import ResultComponent from "../components/ResultComponent";
 
 function UploadFile({ mode, onBack }) {
-
   const [selectedImage, setSelectedImage] = useState(null);
   const [cameraActive, setCameraActive] = useState(false);
   const [stream, setStream] = useState(null);
@@ -11,176 +12,91 @@ function UploadFile({ mode, onBack }) {
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
   const fileInputRef = useRef(null);
-
-
-  // ------------------------------------------------
-  // CAMERA
-  // ------------------------------------------------
-
- const startCamera = async () => {
-  try {
-    const mediaStream =
-      await navigator.mediaDevices.getUserMedia({
+  const startCamera = async () => {
+    try {
+      const mediaStream = await navigator.mediaDevices.getUserMedia({
         video: {
-          facingMode: {
-            ideal: "environment",
-          },
-          width: {
-            ideal: 1280,
-          },
-          height: {
-            ideal: 720,
-          },
+          facingMode: { ideal: "environment" },
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
         },
         audio: false,
       });
 
-    setStream(mediaStream);
-    setCameraActive(true);
-
-  } catch (error) {
-    console.error("Camera error:", error);
-
-    alert(
-      "Camera could not be opened. Please allow camera permission."
-    );
-  }
-};
-  // ------------------------------------------------
-  // STOP CAMERA
-  // ------------------------------------------------
-
-  const stopCamera = () => {
-
-    if (stream) {
-
-      stream.getTracks().forEach((track) => {
-        track.stop();
-      });
-
+      setStream(mediaStream);
+      setCameraActive(true);
+    } catch (error) {
+      console.error("Camera error:", error);
+      alert("Camera could not be opened. Please allow camera permission.");
     }
-
+  };
+  const stopCamera = () => {
+    if (stream) {
+      stream.getTracks().forEach((track) => track.stop());
+    }
     setStream(null);
     setCameraActive(false);
   };
-
-
-  // -----------------------------
-// START CAMERA WHEN MODE = CAMERA
-// -----------------------------
-
-useEffect(() => {
-  if (mode === "camera") {
-    startCamera();
-  }
-
-  return () => {
-    if (stream) {
-      stream.getTracks().forEach((track) => {
-        track.stop();
-      });
-    }
-  };
-}, [mode]);
-
-
-// -----------------------------
-// CONNECT STREAM TO VIDEO
-// -----------------------------
-
-useEffect(() => {
-  if (videoRef.current && stream) {
-    videoRef.current.srcObject = stream;
-
-    videoRef.current
-      .play()
-      .catch((error) => {
-        console.error("Video play error:", error);
-      });
-  }
-}, [stream, cameraActive]);
-
-  // ------------------------------------------------
-  // FILE SELECTION
-  // ------------------------------------------------
-
-  const handleFileChange = (event) => {
-
-    const file = event.target.files[0];
-
-    if (!file) {
-      return;
-    }
-
-    const imageURL = URL.createObjectURL(file);
-
-    setSelectedImage({
-      file: file,
-      url: imageURL
-    });
-
-  };
-
-
-  // ------------------------------------------------
-  // CAPTURE CAMERA IMAGE
-  // ------------------------------------------------
-
-  const captureImage = () => {
-
-    const video = videoRef.current;
-    const canvas = canvasRef.current;
-
-    if (!video || !canvas) {
-      return;
-    }
-
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-
-    const context = canvas.getContext("2d");
-
-    context.drawImage(
-      video,
-      0,
-      0,
-      canvas.width,
-      canvas.height
-    );
-
-    const imageURL = canvas.toDataURL("image/jpeg");
-
-    setSelectedImage({
-      url: imageURL
-    });
-
-    stopCamera();
-
-  };
-
-
-  // ------------------------------------------------
-  // RESET
-  // ------------------------------------------------
-
-  const resetImage = () => {
-
-    setSelectedImage(null);
-    setResult(null);
-
+  useEffect(() => {
     if (mode === "camera") {
       startCamera();
     }
+    return () => {
+      if (stream) {
+        stream.getTracks().forEach((track) => track.stop());
+      }
+    };
+  }, [mode]);
 
+  useEffect(() => {
+    if (videoRef.current && stream) {
+      videoRef.current.srcObject = stream;
+      videoRef.current.play().catch((error) => {
+        console.error("Video play error:", error);
+      });
+    }
+  }, [stream, cameraActive]);
+
+  // ------------------------------------------------
+  // FILE SELECTION & CAPTURE
+  // ------------------------------------------------
+
+  const handleFileChange = (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const imageURL = URL.createObjectURL(file);
+    setSelectedImage({ file, url: imageURL });
   };
 
+  const captureImage = () => {
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+    if (!video || !canvas) return;
+
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    const context = canvas.getContext("2d");
+    context.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+    const imageURL = canvas.toDataURL("image/jpeg");
+    setSelectedImage({ url: imageURL });
+    stopCamera();
+  };
+
+  const resetImage = () => {
+    setSelectedImage(null);
+    setResult(null);
+    if (mode === "camera") {
+      startCamera();
+    }
+  };
 
   // ------------------------------------------------
   // ANALYZE IMAGE
   // ------------------------------------------------
 
-  const analyzeCompliance = () => {
-
+  const analyzeCompliance = async () => {
     if (!selectedImage) {
       alert("Please select or capture an image first.");
       return;
@@ -188,364 +104,117 @@ useEffect(() => {
 
     setAnalyzing(true);
 
-    // Temporary dummy analysis
-    // Later this will call your AI/backend API.
-
-    setTimeout(() => {
-
-      setResult({
-
-        score: 72,
-
-        status: "Non-Compliant",
-
-        productName: "Sample Packaged Commodity",
-
-        details: {
-
-          manufacturer:
-            "ABC Foods Pvt. Ltd.",
-
-          netQuantity:
-            "5 kg",
-
-          mrp:
-            "₹450",
-
-          packingDate:
-            "08/2026",
-
-          consumerCare:
-            "Not detected"
-
-        },
-
-        checks: [
-
+    // try {
+    const formData = new FormData();
+    let data = {
+      filename: "Kurkure.jpeg",
+      barcode: {
+        detected: true,
+        items: [
           {
-            name: "Manufacturer / Packer Details",
-            status: "passed"
+            type: "EAN13",
+            data: "8901491001786",
           },
-
-          {
-            name: "Net Quantity",
-            status: "passed"
-          },
-
-          {
-            name: "MRP Declaration",
-            status: "passed"
-          },
-
-          {
-            name: "Packing Date",
-            status: "passed"
-          },
-
-          {
-            name: "Consumer Care Details",
-            status: "failed"
-          }
-
         ],
-
+      },
+      compliance: {
+        status: "NON-COMPLIANT",
+        fields: {
+          manufacturer_details: "PepsiCo India Holdings Pvt. Ltd.",
+          commodity_name: "POTATO CHIPS",
+          net_quantity: "48g",
+          date_of_manufacture: null,
+          retail_sale_price: null,
+          consumer_care:
+            "The CONSUMER SERVICES MANAGER, PEPSICO INDIA HOLDINGS PVT. LTD., P.O. BOX 27, DLF QUTAB ENCLAVE, PHASE -1, GURUGRAM - 122002, HARYANA, INDIA OR CALL US AT 1800 22 4020 OR EMAIL US AT CONSUMER.FEEDBACK@PEPSICO.COM",
+        },
+        detected_text: "```xml\n\n\n\n\n\n\n```",
+        raw_model_output:
+          "```xml\n<MANUFACTURER>PepsiCo India Holdings Pvt. Ltd.</MANUFACTURER>\n<COMMODITY>POTATO CHIPS</COMMODITY>\n<NET_QUANTITY>48g</NET_QUANTITY>\n<DATE>MISSING</DATE>\n<MRP>MISSING</MRP>\n<CONSUMER_CARE>The CONSUMER SERVICES MANAGER, PEPSICO INDIA HOLDINGS PVT. LTD., P.O. BOX 27, DLF QUTAB ENCLAVE, PHASE -1, GURUGRAM - 122002, HARYANA, INDIA OR CALL US AT 1800 22 4020 OR EMAIL US AT CONSUMER.FEEDBACK@PEPSICO.COM</CONSUMER_CARE>\n```",
+        passed: [
+          {
+            field: "manufacturer_details",
+            rule: "Rule 6(1)(a): Name & Address of Mfg/Packer",
+            value: "PepsiCo India Holdings Pvt. Ltd.",
+          },
+          {
+            field: "commodity_name",
+            rule: "Rule 6(1)(b): Generic/Common Commodity Name",
+            value: "POTATO CHIPS",
+          },
+          {
+            field: "net_quantity",
+            rule: "Rule 6(1)(c): Net Quantity (Weight/Measure/Count)",
+            value: "48g",
+          },
+          {
+            field: "consumer_care",
+            rule: "Rule 6(2): Consumer Complaint Contact Details",
+            value:
+              "The CONSUMER SERVICES MANAGER, PEPSICO INDIA HOLDINGS PVT. LTD., P.O. BOX 27, DLF QUTAB ENCLAVE, PHASE -1, GURUGRAM - 122002, HARYANA, INDIA OR CALL US AT 1800 22 4020 OR EMAIL US AT CONSUMER.FEEDBACK@PEPSICO.COM",
+          },
+        ],
         violations: [
-
-          "Consumer care details were not detected.",
-
-          "Some mandatory declarations may require manual verification."
-
-        ]
-
-      });
-
-      setAnalyzing(false);
-
-    }, 2000);
-
+          {
+            field: "date_of_manufacture",
+            rule: "Rule 6(1)(d): Month & Year of Packing/Mfg",
+            value: null,
+          },
+          {
+            field: "retail_sale_price",
+            rule: "Rule 6(1)(e): Maximum Retail Price (MRP)",
+            value: null,
+          },
+        ],
+        passed_count: 4,
+        violation_count: 2,
+        total_checks: 6,
+        compliant: false,
+        overall_evaluation:
+          "NON-COMPLIANT: Missing or incomplete statutory declarations.",
+      },
+    };
+    setResult(data);
+    //   if (selectedImage.file) {
+    //     formData.append("file", selectedImage.file);
+    //   } else {
+    //     const response = await fetch(selectedImage.url);
+    //     const blob = await response.blob();
+    //     formData.append("file", blob, "camera-capture.jpg");
+    //   }
+    //   const apiResponse = await fetch(`${APP_URL}/scan`, {
+    //     method: "POST",
+    //     body: formData,
+    //   });
+    //   if (!apiResponse.ok) {
+    //     throw new Error("Failed to analyze image");
+    //   }
+    //   const data = await apiResponse.json();
+    //   setResult(data);
+    // } catch (error) {
+    //   console.error("API Error:", error);
+    //   alert(
+    //     "Something went wrong while analyzing the image. Please try again.",
+    //   );
+    // } finally {
+    //   setAnalyzing(false);
+    // }
+    setAnalyzing(false);
   };
 
-
-  // ------------------------------------------------
-  // RESULT PAGE
-  // ------------------------------------------------
-
   if (result) {
-
-    return (
-
-      <div className="min-h-screen bg-gray-50">
-
-        {/* Header */}
-        <header className="border-b bg-white">
-
-          <div className="mx-auto flex max-w-5xl items-center justify-between px-6 py-5">
-
-            <div>
-
-              <h1 className="text-2xl font-bold text-gray-900">
-                LegalMetriScan
-              </h1>
-
-              <p className="text-sm text-gray-500">
-                Compliance Result
-              </p>
-
-            </div>
-
-          </div>
-
-        </header>
-
-
-        <main className="mx-auto max-w-4xl px-6 py-10">
-
-          {/* Back */}
-          <button
-            onClick={() => {
-              setResult(null);
-              setSelectedImage(null);
-              onBack();
-            }}
-            className="mb-8 text-sm font-semibold text-gray-600 hover:text-gray-900"
-          >
-            ← Back to Scanner
-          </button>
-
-
-          {/* Result heading */}
-          <div className="mb-8">
-
-            <h2 className="text-3xl font-bold text-gray-900">
-              Compliance Result
-            </h2>
-
-            <p className="mt-2 text-gray-500">
-              Analysis of the uploaded product label
-            </p>
-
-          </div>
-
-
-          {/* Main result */}
-          <div className="grid gap-6 md:grid-cols-2">
-
-
-            {/* Image */}
-            <div className="rounded-2xl border bg-white p-5">
-
-              <h3 className="mb-4 font-semibold text-gray-800">
-                Scanned Image
-              </h3>
-
-              <img
-                src={selectedImage?.url}
-                alt="Scanned product"
-                className="max-h-96 w-full rounded-xl object-contain"
-              />
-
-            </div>
-
-
-            {/* Score */}
-            <div className="rounded-2xl border bg-white p-6">
-
-              <h3 className="font-semibold text-gray-800">
-                Compliance Score
-              </h3>
-
-              <div className="mt-8 text-center">
-
-                <div className="text-6xl font-bold text-orange-500">
-                  {result.score}
-                </div>
-
-                <div className="mt-2 text-gray-500">
-                  out of 100
-                </div>
-
-                <div className="mt-6 inline-block rounded-full bg-red-100 px-5 py-2 font-semibold text-red-700">
-                  ✕ {result.status}
-                </div>
-
-              </div>
-
-            </div>
-
-          </div>
-
-
-          {/* Product details */}
-          <div className="mt-6 rounded-2xl border bg-white p-6">
-
-            <h3 className="text-xl font-bold text-gray-900">
-              Extracted Product Information
-            </h3>
-
-            <div className="mt-5 grid gap-4 md:grid-cols-2">
-
-              <Detail
-                label="Product Name"
-                value={result.productName}
-              />
-
-              <Detail
-                label="Manufacturer / Packer"
-                value={result.details.manufacturer}
-              />
-
-              <Detail
-                label="Net Quantity"
-                value={result.details.netQuantity}
-              />
-
-              <Detail
-                label="MRP"
-                value={result.details.mrp}
-              />
-
-              <Detail
-                label="Packing Date"
-                value={result.details.packingDate}
-              />
-
-              <Detail
-                label="Consumer Care"
-                value={result.details.consumerCare}
-              />
-
-            </div>
-
-          </div>
-
-
-          {/* Compliance checks */}
-          <div className="mt-6 rounded-2xl border bg-white p-6">
-
-            <h3 className="text-xl font-bold text-gray-900">
-              Compliance Checks
-            </h3>
-
-            <div className="mt-5 space-y-3">
-
-              {result.checks.map((check, index) => (
-
-                <div
-                  key={index}
-                  className="flex items-center justify-between rounded-xl border p-4"
-                >
-
-                  <span className="font-medium text-gray-700">
-                    {check.name}
-                  </span>
-
-                  {check.status === "passed" ? (
-
-                    <span className="rounded-full bg-green-100 px-4 py-1 text-sm font-semibold text-green-700">
-                      ✓ Passed
-                    </span>
-
-                  ) : (
-
-                    <span className="rounded-full bg-red-100 px-4 py-1 text-sm font-semibold text-red-700">
-                      ✕ Failed
-                    </span>
-
-                  )}
-
-                </div>
-
-              ))}
-
-            </div>
-
-          </div>
-
-
-          {/* Violations */}
-          <div className="mt-6 rounded-2xl border border-red-200 bg-red-50 p-6">
-
-            <h3 className="text-xl font-bold text-red-800">
-              ⚠ Violations / Warnings
-            </h3>
-
-            <div className="mt-4 space-y-3">
-
-              {result.violations.map((violation, index) => (
-
-                <div
-                  key={index}
-                  className="rounded-lg bg-white p-4 text-red-700"
-                >
-                  {violation}
-                </div>
-
-              ))}
-
-            </div>
-
-          </div>
-
-
-          {/* Buttons */}
-          <div className="mt-8 flex flex-col gap-4 sm:flex-row">
-
-            <button
-              onClick={() => {
-                setResult(null);
-                setSelectedImage(null);
-
-                if (mode === "camera") {
-                  startCamera();
-                }
-              }}
-              className="flex-1 rounded-xl bg-green-600 px-6 py-4 font-semibold text-white hover:bg-green-700"
-            >
-              Scan Another Product
-            </button>
-
-
-            <button
-              onClick={() => alert("Full report feature will be added later.")}
-              className="flex-1 rounded-xl border border-gray-300 bg-white px-6 py-4 font-semibold text-gray-700 hover:bg-gray-50"
-            >
-              View Full Report
-            </button>
-
-          </div>
-
-        </main>
-
-      </div>
-
-    );
-
+    return <ResultComponent result={result} selectedImage={selectedImage} />;
   }
 
-
-  // ------------------------------------------------
-  // SCANNER PAGE
-  // ------------------------------------------------
-
   return (
-
     <div className="min-h-screen bg-gray-50">
-
-      {/* Header */}
       <header className="border-b bg-white">
-
         <div className="mx-auto flex max-w-5xl items-center justify-between px-6 py-5">
-
           <div>
-
-            <h1 className="text-2xl font-bold text-gray-900">
-              LegalMetriScan
-            </h1>
-
+            <h1 className="text-2xl font-bold text-gray-900">LegalMetriScan</h1>
             <p className="text-sm text-gray-500">
               Packaged Commodity Compliance Checker
             </p>
-
           </div>
 
           <button
@@ -554,80 +223,50 @@ useEffect(() => {
           >
             ← Home
           </button>
-
         </div>
-
       </header>
 
-
       <main className="mx-auto max-w-3xl px-6 py-10">
-
-
-        {/* Title */}
         <div className="text-center">
-
           <h2 className="text-3xl font-bold text-gray-900">
-            {mode === "camera"
-              ? "Scan Product Label"
-              : "Upload Product Image"}
+            {mode === "camera" ? "Scan Product Label" : "Upload Product Image"}
           </h2>
-
           <p className="mt-3 text-gray-500">
             Make sure the product declarations are clearly visible.
           </p>
-
         </div>
 
-
-        {/* Camera */}
         {mode === "camera" && cameraActive && (
-
           <div className="mt-8 rounded-2xl border bg-white p-5 shadow-sm">
-
-           <video
-             ref={videoRef}
-             autoPlay
-             playsInline
-             muted
-             className="h-auto max-h-[600px] w-full rounded-xl bg-black object-cover"
-           />
-
+            <video
+              ref={videoRef}
+              autoPlay
+              playsInline
+              muted
+              className="h-auto max-h-150 w-full rounded-xl bg-black object-cover"
+            />
             <button
               onClick={captureImage}
               className="mt-5 w-full rounded-xl bg-green-600 px-6 py-4 font-semibold text-white hover:bg-green-700"
             >
               📷 Capture Image
             </button>
-
           </div>
-
         )}
 
-
-        {/* Upload */}
         {mode === "upload" && !selectedImage && (
-
           <div className="mt-8 rounded-2xl border-2 border-dashed border-gray-300 bg-white p-12 text-center">
-
-            <div className="text-5xl">
-              🖼️
-            </div>
-
+            <div className="text-5xl">🖼️</div>
             <h3 className="mt-5 text-xl font-bold text-gray-800">
               Upload Product Image
             </h3>
-
-            <p className="mt-2 text-gray-500">
-              JPG, JPEG or PNG
-            </p>
-
+            <p className="mt-2 text-gray-500">JPG, JPEG or PNG</p>
             <button
               onClick={() => fileInputRef.current.click()}
               className="mt-6 rounded-xl bg-green-600 px-7 py-3 font-semibold text-white hover:bg-green-700"
             >
               Choose Image
             </button>
-
             <input
               ref={fileInputRef}
               type="file"
@@ -635,106 +274,71 @@ useEffect(() => {
               onChange={handleFileChange}
               className="hidden"
             />
-
           </div>
-
         )}
 
-
-        {/* Preview */}
         {selectedImage && (
-
           <div className="mt-8 rounded-2xl border bg-white p-6 shadow-sm">
-
             <h3 className="mb-4 text-lg font-bold text-gray-800">
               Product Image
             </h3>
-
             <img
               src={selectedImage.url}
               alt="Selected product"
               className="mx-auto max-h-96 rounded-xl object-contain"
             />
 
-
-            {/* Buttons */}
             <div className="mt-6 flex flex-col gap-3 sm:flex-row">
-
               <button
                 onClick={resetImage}
                 className="flex-1 rounded-xl border border-gray-300 px-5 py-3 font-semibold text-gray-700 hover:bg-gray-50"
               >
                 Choose Another
               </button>
-
               <button
                 onClick={analyzeCompliance}
                 disabled={analyzing}
                 className="flex-1 rounded-xl bg-green-600 px-5 py-3 font-semibold text-white hover:bg-green-700 disabled:opacity-50"
               >
-                {analyzing
-                  ? "Analyzing..."
-                  : "Analyze Compliance"}
+                {analyzing ? "Analyzing..." : "Analyze Compliance"}
               </button>
-
             </div>
-
           </div>
-
         )}
 
-
-        {/* Camera loading */}
         {mode === "camera" && !cameraActive && !selectedImage && (
-
           <div className="mt-10 rounded-xl bg-white p-8 text-center">
-
-            <p className="text-gray-500">
-              Starting camera...
-            </p>
-
+            <p className="text-gray-500">Starting camera...</p>
           </div>
-
         )}
 
-
-        {/* Hidden canvas */}
-        <canvas
-          ref={canvasRef}
-          className="hidden"
-        />
-
+        <canvas ref={canvasRef} className="hidden" />
       </main>
-
     </div>
-
   );
 }
-
 
 // ------------------------------------------------
 // DETAIL COMPONENT
 // ------------------------------------------------
 
 function Detail({ label, value }) {
+  const isMissing = !value || value === "MISSING";
 
   return (
-
     <div className="rounded-xl bg-gray-50 p-4">
-
-      <p className="text-sm text-gray-500">
+      <p className="text-xs font-medium uppercase tracking-wider text-gray-500">
         {label}
       </p>
-
-      <p className="mt-1 font-semibold text-gray-900">
-        {value}
+      <p
+        className={`mt-1 font-semibold ${
+          isMissing ? "text-red-500 italic" : "text-gray-900"
+        }`}
+      >
+        {isMissing ? "Not detected" : value}
       </p>
-
     </div>
-
   );
-
 }
-
 
 export default UploadFile;
