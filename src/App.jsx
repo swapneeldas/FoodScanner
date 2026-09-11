@@ -1,8 +1,8 @@
 import "./App.css";
-import ImageCapture from "./pages/UploadFile";
+import Home from "./pages/Home";
 
 function App() {
-  return <ImageCapture />;
+  return <Home />;
 }
 
 export default App;
